@@ -90,6 +90,11 @@ void mm_init(void)
 	       "npages: 0x%lx, meta_page_size: 0x%lx\n",
 	       page_meta_start, start_vaddr, npages, sizeof(struct page));
 
+	// kinfo("img end address is: 0x%lx", &img_end);
+		// img end address is: 0xa0000
+	// [INFO] [CHCORE] mm: free_mem_start is 0xffffff00000a0000, free_mem_end is 0xffffff0020c00000
+	// [INFO] page_meta_start: 0xffffff00000a0000, real_start_vadd: 0xffffff0001800000,npages: 0x1f400, meta_page_size: 0x20
+	
 	/* buddy alloctor for managing physical memory */
 	init_buddy(&global_mem, page_meta_start, start_vaddr, npages);
 

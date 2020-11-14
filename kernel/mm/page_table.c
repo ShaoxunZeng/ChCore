@@ -139,6 +139,7 @@ static int get_next_ptp(ptp_t * cur_ptp, u32 level, vaddr_t va,
 	*next_ptp = (ptp_t *) GET_NEXT_PTP(entry);
 	*pte = entry;
 	if (IS_PTE_TABLE(entry->pte))
+		/* notice table entry and page entry are all NORMAL_PTP */
 		return NORMAL_PTP;
 	else
 		return BLOCK_PTP;
@@ -162,7 +163,31 @@ static int get_next_ptp(ptp_t * cur_ptp, u32 level, vaddr_t va,
 int query_in_pgtbl(vaddr_t * pgtbl, vaddr_t va, paddr_t * pa, pte_t ** entry)
 {
 	// <lab2>
-
+	ptp_t *cur_ptp = (ptp_t *)pgtbl;
+	ptp_t *next_ptp;
+	int level = 0;
+	while(level < 4){
+		/* notice alloc is 0 */
+		int ret = get_next_ptp(cur_ptp, level, va, &next_ptp, entry, 0);
+		if(ret < 0){
+			return ret;
+		}
+		/* if block, return the pa and block entry immediately */
+		if(ret == BLOCK_PTP){
+			/* interprete pfn depending on the page table level */
+			if(level == 1){
+				*pa = (*entry)->l1_block.pfn << L1_INDEX_SHIFT + GET_VA_OFFSET_L1(va);
+			} else if(level == 2){
+				*pa = (*entry)->l2_block.pfn << L2_INDEX_SHIFT + GET_VA_OFFSET_L2(va);
+			} else {
+				return -1;
+			}
+		}
+		cur_ptp = next_ptp;
+		level++;
+	}
+	/* last page table */
+	*pa = (*entry)->l3_page.pfn << L3_INDEX_SHIFT + GET_VA_OFFSET_L3(va);
 	// </lab2>
 	return 0;
 }
@@ -186,7 +211,40 @@ int map_range_in_pgtbl(vaddr_t * pgtbl, vaddr_t va, paddr_t pa,
 		       size_t len, vmr_prop_t flags)
 {
 	// <lab2>
+	while(len > 0){
+		ptp_t *cur_ptp = (ptp_t *)pgtbl;
+		ptp_t *next_ptp;
+		pte_t *entry;
+		int level = 0;
+		while(level < 3){
+			/* notice alloc is 1 along the way, to allocate the new page in the page table */
+			int ret = get_next_ptp(cur_ptp, level, va, &next_ptp, &entry, 1);
+			if(ret < 0){
+				return ret;
+			}
+			if(ret == BLOCK_PTP){
+				return -1;
+			}
+			cur_ptp = next_ptp;
+			level++;
+		}
+		/* level == 3, get the corresponding page entry and modify the flags */
+		u32 index = GET_L3_INDEX(va);
+		entry = &(next_ptp->ent[index]);
 
+		entry->pte = 0;
+		entry->l3_page.is_valid = 1;
+		entry->l3_page.is_page = 1;
+		entry->l3_page.pfn = pa >> PAGE_SHIFT;
+
+		set_pte_flags(entry, flags, va >= KBASE ? KERNEL_PTE : USER_PTE);
+
+		len -= PAGE_SIZE;
+		va += PAGE_SIZE;
+		pa += PAGE_SIZE;
+	}
+
+	flush_tlb();
 	// </lab2>
 	return 0;
 }
@@ -207,7 +265,50 @@ int map_range_in_pgtbl(vaddr_t * pgtbl, vaddr_t va, paddr_t pa,
 int unmap_range_in_pgtbl(vaddr_t * pgtbl, vaddr_t va, size_t len)
 {
 	// <lab2>
+	while(len > 0){
+		pte_t *entry;
+		paddr_t pa;
+		ptp_t *cur_ptp = (ptp_t *)pgtbl;
+		ptp_t *next_ptp;
 
+		int level = 0;
+		int delete = 0;
+		while(level < 3){
+			int ret = get_next_ptp(cur_ptp, level, va, &next_ptp, &entry, 0);
+			/* break if the page is unmapped */
+			if(ret == -ENOMAPPING){
+				break;
+			}
+			if(ret < 0){
+				return ret;
+			}
+			/* delete the block */
+			if(ret == BLOCK_PTP){
+				delete = 1;
+				/* is_valid field is all the same among different types */
+				/* change the is_valid flag */
+				entry->table.is_valid = 0;
+				break;
+			}
+			cur_ptp = next_ptp;
+			level++;
+		}
+		/* delete the 4K page */
+		if(!delete){
+			/* level == 3 */
+			u32 index = GET_L3_INDEX(va);
+			entry = &(next_ptp->ent[index]);
+			/* change the is_valid flag */
+			entry->l3_page.is_valid = 0;
+		}
+
+		len -= PAGE_SIZE;
+		va += PAGE_SIZE;
+		pa += PAGE_SIZE;
+	}
+
+
+	flush_tlb();
 	// </lab2>
 	return 0;
 }
