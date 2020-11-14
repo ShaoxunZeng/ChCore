@@ -48,10 +48,24 @@ unsigned long get_ttbr1(void)
  * 2. fill the block entry with corresponding attribution bit
  *
  */
+#define UXN	       (0x1UL << 54)
+#define ACCESSED       (0x1UL << 10)
+#define INNER_SHARABLE (0x3UL << 8)
+#define NORMAL_MEMORY  (0x4UL << 2)
+#define IS_VALID (1UL << 0)
+
 void map_kernel_space(vaddr_t va, paddr_t pa, size_t len)
 {
 	// <lab2>
+	vaddr_t *pgtbl = (vaddr_t *)get_ttbr1();
+	vmr_prop_t flags = 0UL 
+		| UXN
+		| ACCESSED
+		| INNER_SHARABLE
+		| NORMAL_MEMORY
+		| IS_VALID;
 
+	map_range_in_pgtbl(pgtbl, va, pa, len, flags);
 	// </lab2>
 }
 
