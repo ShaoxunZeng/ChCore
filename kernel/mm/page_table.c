@@ -210,8 +210,11 @@ int query_in_pgtbl(vaddr_t * pgtbl, vaddr_t va, paddr_t * pa, pte_t ** entry)
 int map_range_in_pgtbl(vaddr_t * pgtbl, vaddr_t va, paddr_t pa,
 		       size_t len, vmr_prop_t flags)
 {
+	pa = ROUND_DOWN(pa, PAGE_SIZE);
+	va = ROUND_DOWN(va, PAGE_SIZE);
+	len = ROUND_UP(len, PAGE_SIZE);
 	// <lab2>
-	while(len > 0){
+	for(int i = 0; i < len/PAGE_SIZE; i++){
 		ptp_t *cur_ptp = (ptp_t *)pgtbl;
 		ptp_t *next_ptp;
 		pte_t *entry;
@@ -239,7 +242,6 @@ int map_range_in_pgtbl(vaddr_t * pgtbl, vaddr_t va, paddr_t pa,
 
 		set_pte_flags(entry, flags, va >= KBASE ? KERNEL_PTE : USER_PTE);
 
-		len -= PAGE_SIZE;
 		va += PAGE_SIZE;
 		pa += PAGE_SIZE;
 	}

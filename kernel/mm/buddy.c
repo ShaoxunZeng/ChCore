@@ -162,8 +162,9 @@ struct page *buddy_get_pages(struct phys_mem_pool *pool, u64 order)
 		head->allocated = 1;
 		head--;
 	}
+	head++;
 	
-	return page;
+	return head;
 	// </lab2>
 }
 

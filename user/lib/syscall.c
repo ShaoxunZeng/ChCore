@@ -13,6 +13,59 @@ u64 syscall(u64 sys_no, u64 arg0, u64 arg1, u64 arg2, u64 arg3, u64 arg4,
 	 * And finally use svc to execute the system call. After syscall returned, don't forget
 	 * to move return value from x0 to the ret variable of this function
 	 */
+
+	__asm__ ("mov x0, %0\n\t"
+			: 
+			: "r"(arg0)
+			: "x0");
+
+	__asm__ ("mov x1, %0\n\t"
+			: 
+			: "r"(arg1)
+			: "x1");
+
+	__asm__ ("mov x2, %0\n\t"
+			: 
+			: "r"(arg2)
+			: "x2");
+
+	__asm__ ("mov x3, %0\n\t"
+			: 
+			: "r"(arg3)
+			: "x3");
+
+	__asm__ ("mov x4, %0\n\t"
+			: 
+			: "r"(arg4)
+			: "x4");
+
+	__asm__ ("mov x5, %0\n\t"
+			: 
+			: "r"(arg5)
+			: "x5");
+
+	__asm__ ("mov x6, %0\n\t"
+			: 
+			: "r"(arg6)
+			: "x6");
+
+	__asm__ ("mov x7, %0\n\t"
+			: 
+			: "r"(arg7)
+			: "x7");
+
+	__asm__ ("mov x8, %0\n\t"
+			: 
+			: "r"(sys_no)
+			: "x8");
+
+	__asm__ ("svc #0");											
+
+	__asm__ ("mov %0, x0\n\t"
+			: "=r"(ret)
+			: 
+			: "x0");
+
 	return ret;
 }
 
@@ -22,6 +75,8 @@ u64 syscall(u64 sys_no, u64 arg0, u64 arg1, u64 arg2, u64 arg3, u64 arg4,
  */
 void usys_putc(char ch)
 {
+	syscall(SYS_putc, ch, 0, 0, 0, 0, 0, 0, 0, 0);
+	return;
 }
 
 void usys_exit(int ret)
