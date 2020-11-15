@@ -90,8 +90,39 @@ static struct page *split_page(struct phys_mem_pool *pool, u64 order,
 			       struct page *page)
 {
 	// <lab2>
-	struct page *split_page = NULL;
-	return split_page;
+	if(order == page->order)
+		return page;
+
+	/* delete the page need to be split */
+	list_del(&page->node);
+	pool->free_lists[page->order].nr_free--;
+
+	struct page *head = page;
+	int half_order = head->order-1;
+
+	/* spilt the page into two equal parts */
+	/* first part, modify the order */
+	for(int i = 0; i < (1 << half_order); i++){
+		head->order = half_order;
+		head--;
+	}
+
+	list_add(&page->node, &pool->free_lists[page->order].free_list);
+	pool->free_lists[page->order].nr_free++;
+
+	/* second part */
+	head->order = half_order;
+	list_add(&head->node, &pool->free_lists[head->order].free_list);
+	pool->free_lists[head->order].nr_free++;
+
+	/* modify the order */
+	for(int i = 0; i < (1 << half_order); i++){
+		head->order = half_order;
+		head--;
+	}
+
+	/* continue to split the first part */
+	return split_page(pool, order, page);
 	// </lab2>
 }
 
@@ -106,8 +137,32 @@ static struct page *split_page(struct phys_mem_pool *pool, u64 order,
 struct page *buddy_get_pages(struct phys_mem_pool *pool, u64 order)
 {
 	// <lab2>
-	struct page *page = NULL;
+	/* find the first index of free_lists whose size larger than the (1 << order) */
+	int list_index = order;
+	while(list_index < BUDDY_MAX_ORDER && pool->free_lists[list_index].nr_free == 0){
+		list_index++;
+	}
+	/* not found */
+	if(list_index == BUDDY_MAX_ORDER)
+		return NULL;
+	
+	/* get the page based on the list node */
+	struct page *page = list_entry(pool->free_lists[list_index].free_list.next, struct page, node);
 
+	/* split the page to best fit the size */
+	page = split_page(pool, order, page);
+
+	/* delete from the list and modify the nr_free field */
+	list_del(&page->node);
+	pool->free_lists[page->order].nr_free--;
+
+	/* modify the allocated flag */
+	struct page *head = page;
+	for(int i = 0; i < (1 << page->order); i++){
+		head->allocated = 1;
+		head--;
+	}
+	
 	return page;
 	// </lab2>
 }
@@ -124,9 +179,36 @@ struct page *buddy_get_pages(struct phys_mem_pool *pool, u64 order)
 static struct page *merge_page(struct phys_mem_pool *pool, struct page *page)
 {
 	// <lab2>
+	struct page *buddy_chunk = get_buddy_chunk(pool, page);
 
-	struct page *merge_page = NULL;
-	return merge_page;
+	/* no need to merge */
+	if(buddy_chunk == NULL || buddy_chunk->allocated || page->order == BUDDY_MAX_ORDER-1){
+		return page;
+	}
+
+    /* merge */
+	/* delete the buddy chunk from its free list */
+	list_del(&buddy_chunk->node);
+	pool->free_lists[buddy_chunk->order].nr_free--;
+
+	/* delete the page chunk from its free list */
+	list_del(&page->node);
+	pool->free_lists[page->order].nr_free--;
+
+	/* choose higher address to continue merge */
+	if(buddy_chunk > page){
+		buddy_chunk->order++;
+		list_add(&buddy_chunk->node, &pool->free_lists[buddy_chunk->order].free_list);
+		pool->free_lists[buddy_chunk->order].nr_free++;
+
+		return merge_page(pool, buddy_chunk);
+	} else {
+		page->order++;
+		list_add(&page->node, &pool->free_lists[page->order].free_list);
+		pool->free_lists[page->order].nr_free++;
+
+		return merge_page(pool, page);
+	}
 	// </lab2>
 }
 
@@ -140,7 +222,28 @@ static struct page *merge_page(struct phys_mem_pool *pool, struct page *page)
 void buddy_free_pages(struct phys_mem_pool *pool, struct page *page)
 {
 	// <lab2>
+	/* move to the head of the free page, as well as set the allocated flag */
+	struct page *head = page;
+	for(int i = 0; i < (1 << page->order); i++){
+		head->allocated = 0;
+		head++;
+	}
+	head--;
 
+    /* add to the free list */
+	list_add(&head->node, &pool->free_lists[head->order].free_list);
+	pool->free_lists[head->order].nr_free++;
+	
+	/* merge with other free blocks */
+	head = merge_page(pool, head);
+
+	/* modify the order field at one time, notice merge_page returned head pags's order is always correct */
+	int order = head->order;
+	for(int i = 0; i < (1 << order); i++){
+		head->order = order;
+		head--;
+	}
+	return;
 	// </lab2>
 }
 
