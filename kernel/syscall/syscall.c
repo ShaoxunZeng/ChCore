@@ -40,5 +40,9 @@ void sys_putc(char ch)
 const void *syscall_table[NR_SYSCALL] = {
 	[0 ... NR_SYSCALL - 1] = sys_debug,
 	[SYS_putc] = sys_putc,
+	[SYS_exit] = sys_exit,
+	[SYS_create_pmo] = sys_create_pmo,
+	[SYS_map_pmo] = sys_map_pmo,
+	[SYS_handle_brk] = sys_handle_brk,
 	/* lab3 syscalls finished */
 };

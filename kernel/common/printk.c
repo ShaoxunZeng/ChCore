@@ -207,6 +207,13 @@ static int simple_vsprintf(char **out, const char *format, va_list ap)
 						     flags, 'a');
 				break;
 
+			case ('b'):
+				u.u = va_arg(ap, unsigned int);
+				pc +=
+				    printk_write_num(out, u.u, 2, 0, width,
+						     flags, 'a');
+				break;
+
 			case ('o'):
 				u.u = va_arg(ap, unsigned int);
 				pc +=

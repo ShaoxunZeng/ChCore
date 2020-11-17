@@ -347,11 +347,53 @@ u64 sys_handle_brk(u64 addr)
 	 * top.
 	 *
 	 */
+	ret = vmspace->user_current_heap;
+	
+	if(addr == 0){
+		pmo = obj_alloc(TYPE_PMO, sizeof(*pmo));
+		if (!pmo) {
+			retval = -ENOMEM;
+			goto error;
+		}
+		pmo_init(pmo, PMO_ANONYM, 0, 0);
+		int pmo_cap = cap_alloc(current_process, pmo, 0);
+		if (pmo_cap < 0) {
+			retval = pmo_cap;
+			goto error;
+		}
+
+		vmr = init_heap_vmr(vmspace, vmspace->user_current_heap, pmo);
+		if(vmr == NULL){
+			/* same reason as init_heap_vmr return null */
+			retval = -EINVAL;
+			goto error;
+		}
+		/* add to heap_vmr field */
+		vmspace->heap_vmr = vmr;
+
+		retval = vmspace->user_current_heap;
+	} 
+	else if(addr > (vmspace->user_current_heap + vmspace->heap_vmr->size)){
+		vmr = vmspace->heap_vmr;
+		pmo = vmr->pmo;
+
+		/* update the pmo's and vmr's size */
+		int new_size = ROUND_UP((addr - vmspace->user_current_heap), PAGE_SIZE);
+		pmo->size = new_size;
+		vmr->size = new_size;
+
+		retval = addr;
+	}
+	else if(addr < (vmspace->user_current_heap + vmspace->heap_vmr->size)){
+		retval = -EINVAL;
+		goto error;
+	}
 
 	/*
 	 * return origin heap addr on failure;
 	 * return new heap addr on success.
 	 */
+error:	
 	obj_put(vmspace);
 	return retval;
 }
