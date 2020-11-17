@@ -48,10 +48,24 @@ unsigned long get_ttbr1(void)
  * 2. fill the block entry with corresponding attribution bit
  *
  */
+#define UXN	       (0x1UL << 54)
+#define ACCESSED       (0x1UL << 10)
+#define INNER_SHARABLE (0x3UL << 8)
+#define NORMAL_MEMORY  (0x4UL << 2)
+#define IS_VALID (1UL << 0)
+
 void map_kernel_space(vaddr_t va, paddr_t pa, size_t len)
 {
 	// <lab2>
+	vaddr_t *pgtbl = (vaddr_t *)get_ttbr1();
+	vmr_prop_t flags = 0UL 
+		| UXN
+		| ACCESSED
+		| INNER_SHARABLE
+		| NORMAL_MEMORY
+		| IS_VALID;
 
+	map_range_in_pgtbl(pgtbl, va, pa, len, flags);
 	// </lab2>
 }
 
@@ -90,6 +104,11 @@ void mm_init(void)
 	       "npages: 0x%lx, meta_page_size: 0x%lx\n",
 	       page_meta_start, start_vaddr, npages, sizeof(struct page));
 
+	// kinfo("img end address is: 0x%lx", &img_end);
+		// img end address is: 0xa0000
+	// [INFO] [CHCORE] mm: free_mem_start is 0xffffff00000a0000, free_mem_end is 0xffffff0020c00000
+	// [INFO] page_meta_start: 0xffffff00000a0000, real_start_vadd: 0xffffff0001800000,npages: 0x1f400, meta_page_size: 0x20
+	
 	/* buddy alloctor for managing physical memory */
 	init_buddy(&global_mem, page_meta_start, start_vaddr, npages);
 

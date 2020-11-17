@@ -7,6 +7,9 @@ set(CROSS_COMPILE "aarch64-linux-gnu-")
 set(CMAKE_C_COMPILER "${CROSS_COMPILE}gcc")
 set(CMAKE_ASM_COMPILER "${CROSS_COMPILE}gcc")
 
+set(CMAKE_C_FLAGS_RELEASE "-O1 -g2")
+set(CMAKE_C_FLAGS_DEBUG "-O0 -g")
+
 set(C_COMPILER_NOSTDINC "-nostdinc -nostdlib -nostartfiles")
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} \

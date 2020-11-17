@@ -28,6 +28,8 @@ execute_process (
 	OUTPUT_VARIABLE C_COMPILER_INCLUDE
 )
 
+set(CMAKE_C_FLAGS_RELEASE "-O1 -g2")
+set(CMAKE_C_FLAGS_DEBUG "-O0 -g")
 
 set(CMAKE_C_FLAGS
     "-Wall -fPIC -nostdlib -nostartfiles -ffreestanding \
