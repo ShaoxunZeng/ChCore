@@ -176,9 +176,9 @@ int query_in_pgtbl(vaddr_t * pgtbl, vaddr_t va, paddr_t * pa, pte_t ** entry)
 		if(ret == BLOCK_PTP){
 			/* interprete pfn depending on the page table level */
 			if(level == 1){
-				*pa = (*entry)->l1_block.pfn << L1_INDEX_SHIFT + GET_VA_OFFSET_L1(va);
+				*pa = ((*entry)->l1_block.pfn << L1_INDEX_SHIFT) + GET_VA_OFFSET_L1(va);
 			} else if(level == 2){
-				*pa = (*entry)->l2_block.pfn << L2_INDEX_SHIFT + GET_VA_OFFSET_L2(va);
+				*pa = ((*entry)->l2_block.pfn << L2_INDEX_SHIFT) + GET_VA_OFFSET_L2(va);
 			} else {
 				return -1;
 			}
@@ -187,7 +187,7 @@ int query_in_pgtbl(vaddr_t * pgtbl, vaddr_t va, paddr_t * pa, pte_t ** entry)
 		level++;
 	}
 	/* last page table */
-	*pa = (*entry)->l3_page.pfn << L3_INDEX_SHIFT + GET_VA_OFFSET_L3(va);
+	*pa = ((*entry)->l3_page.pfn << L3_INDEX_SHIFT) + GET_VA_OFFSET_L3(va);
 	// </lab2>
 	return 0;
 }

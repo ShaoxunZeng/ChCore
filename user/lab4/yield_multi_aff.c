@@ -28,7 +28,7 @@ void *thread_routine(void *arg)
 		aff = usys_get_affinity(child_thread_caps[thread_id]);
 
 		printf("Iteration %lu, thread %lu, cpu %u, aff %d\n", times,
-		       thread_id, usys_get_cpu_id(), aff);
+		       thread_id, usys_get_cpu_id(), aff);	
 
 		usys_set_affinity(child_thread_caps[prev_thread_id],
 				  (thread_id + times) % 4);
@@ -37,7 +37,7 @@ void *thread_routine(void *arg)
 
 		usys_yield();
 	}
-
+	while (start_flags[thread_id] == 0) ;
 	/* usys_exit: just de-schedule itself without reclaiming the resource */
 	usys_exit(0);
 	return 0;
@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
 		    create_thread(thread_routine, thread_i, PRIO, thread_i % 4);
 		if (child_thread_caps[thread_i] < 0)
 			printf("Create thread failed, return %d\n",
-			       child_thread_caps[thread_i]);
+			       child_thread_caps[thread_i]);		   
 		for (i = 0; i < 10000; i++) ;
 	}
 

@@ -104,7 +104,7 @@ static struct page *split_page(struct phys_mem_pool *pool, u64 order,
 	/* first part, modify the order */
 	for(int i = 0; i < (1 << half_order); i++){
 		head->order = half_order;
-		head--;
+		head++;
 	}
 
 	list_add(&page->node, &pool->free_lists[page->order].free_list);
@@ -118,7 +118,7 @@ static struct page *split_page(struct phys_mem_pool *pool, u64 order,
 	/* modify the order */
 	for(int i = 0; i < (1 << half_order); i++){
 		head->order = half_order;
-		head--;
+		head++;
 	}
 
 	/* continue to split the first part */
@@ -160,11 +160,10 @@ struct page *buddy_get_pages(struct phys_mem_pool *pool, u64 order)
 	struct page *head = page;
 	for(int i = 0; i < (1 << page->order); i++){
 		head->allocated = 1;
-		head--;
+		head++;
 	}
-	head++;
 	
-	return head;
+	return page;
 	// </lab2>
 }
 
@@ -183,7 +182,10 @@ static struct page *merge_page(struct phys_mem_pool *pool, struct page *page)
 	struct page *buddy_chunk = get_buddy_chunk(pool, page);
 
 	/* no need to merge */
-	if(buddy_chunk == NULL || buddy_chunk->allocated || page->order == BUDDY_MAX_ORDER-1){
+	if(buddy_chunk == NULL 
+	|| buddy_chunk->allocated==1 
+	|| page->order == BUDDY_MAX_ORDER-1
+	|| buddy_chunk->order != page->order){
 		return page;
 	}
 
@@ -196,8 +198,8 @@ static struct page *merge_page(struct phys_mem_pool *pool, struct page *page)
 	list_del(&page->node);
 	pool->free_lists[page->order].nr_free--;
 
-	/* choose higher address to continue merge */
-	if(buddy_chunk > page){
+	/* choose lower address to continue merge */
+	if(buddy_chunk < page){
 		buddy_chunk->order++;
 		list_add(&buddy_chunk->node, &pool->free_lists[buddy_chunk->order].free_list);
 		pool->free_lists[buddy_chunk->order].nr_free++;
@@ -229,20 +231,19 @@ void buddy_free_pages(struct phys_mem_pool *pool, struct page *page)
 		head->allocated = 0;
 		head++;
 	}
-	head--;
 
     /* add to the free list */
-	list_add(&head->node, &pool->free_lists[head->order].free_list);
-	pool->free_lists[head->order].nr_free++;
+	list_add(&page->node, &pool->free_lists[page->order].free_list);
+	pool->free_lists[page->order].nr_free++;
 	
 	/* merge with other free blocks */
-	head = merge_page(pool, head);
+	head = merge_page(pool, page);
 
 	/* modify the order field at one time, notice merge_page returned head pags's order is always correct */
 	int order = head->order;
 	for(int i = 0; i < (1 << order); i++){
 		head->order = order;
-		head--;
+		head++;
 	}
 	return;
 	// </lab2>

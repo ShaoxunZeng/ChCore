@@ -17,6 +17,7 @@
 #include <common/registers.h>
 #include <process/thread.h>
 #include <sched/sched.h>
+#include <sched/context.h>
 
 struct thread_ctx *create_thread_ctx(void)
 {

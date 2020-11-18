@@ -319,9 +319,7 @@ u64 sys_handle_brk(u64 addr)
 	struct vmspace *vmspace;
 	struct pmobject *pmo;
 	struct vmregion *vmr;
-	size_t len;
-	u64 retval;
-	int ret;
+	u64 retval = -1;
 
 	vmspace = obj_get(current_process, VMSPACE_OBJ_ID, TYPE_VMSPACE);
 
@@ -347,7 +345,6 @@ u64 sys_handle_brk(u64 addr)
 	 * top.
 	 *
 	 */
-	ret = vmspace->user_current_heap;
 	
 	if(addr == 0){
 		pmo = obj_alloc(TYPE_PMO, sizeof(*pmo));

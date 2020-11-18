@@ -45,7 +45,7 @@ u32 sys_getc(void)
  */
 u32 sys_get_cpu_id(void)
 {
-	return -1;
+	return smp_get_cpu_id();
 }
 
 /*
@@ -71,6 +71,7 @@ const void *syscall_table[NR_SYSCALL] = {
 	[SYS_register_server] = sys_register_server,
 	[SYS_register_client] = sys_register_client,
 	[SYS_ipc_call] = sys_ipc_call,
+	[SYS_ipc_reg_call] = sys_ipc_reg_call,
 	[SYS_ipc_return] = sys_ipc_return,
 	[SYS_cap_copy_to] = sys_cap_copy_to,
 	[SYS_cap_copy_from] = sys_cap_copy_from,

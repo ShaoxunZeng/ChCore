@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.11)
 
+set(CMAKE_C_FLAGS_RELEASE "-O1 -g2")
+set(CMAKE_C_FLAGS_DEBUG "-O0 -g")
+
 set(TEST_LAB4_BINS
     "yield_single"
     "yield_spin"

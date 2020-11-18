@@ -40,6 +40,15 @@ void handle_irq(int type)
 	 *	The irq is from the kernel
 	 * 	The thread being interrupted is an idle thread.
 	 */
+	if(type >= SYNC_EL0_64){
+		// printk("irq lock!");
+		lock_kernel();
+	}
+	/* if the irq is from idle thread (which is run under EL1) */
+	/* we should lock the kernel */
+	else if(current_thread == NULL || current_thread->thread_ctx->type == TYPE_IDLE){
+		lock_kernel();	
+	}
 
 	plat_handle_irq();
 
@@ -47,6 +56,7 @@ void handle_irq(int type)
 	 * Lab4
 	 * Do you miss something?
 	 */
+	eret_to_thread(switch_context());
 }
 
 void plat_handle_irq(void)

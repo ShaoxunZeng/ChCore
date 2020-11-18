@@ -176,7 +176,9 @@ static u64 load_binary(struct process *process,
 			 * and mapping physical memory.
 			 */
 			seg_sz = elf->p_headers[i].p_memsz;
-			seg_map_sz = ROUND_UP(seg_sz, PAGE_SIZE);
+			p_vaddr = elf->p_headers[i].p_vaddr;
+
+			seg_map_sz = ROUND_UP(seg_sz + p_vaddr, PAGE_SIZE) - ROUND_DOWN(p_vaddr, PAGE_SIZE);
 
 			pmo = obj_alloc(TYPE_PMO, sizeof(*pmo));
 			if (!pmo) {
@@ -196,14 +198,13 @@ static u64 load_binary(struct process *process,
 			 * The physical address of a pmo can be get from pmo->start.
 			 */
 			vaddr_t pmo_start_vaddr = (vaddr_t) phys_to_virt(pmo->start);
-			char *pos = bin + elf->p_headers[i].p_offset;
+			pmo_start_vaddr += p_vaddr - ROUND_DOWN(p_vaddr, PAGE_SIZE);
+			char *pos = (void*)bin + elf->p_headers[i].p_offset;
 			size_t copy_size = elf->p_headers[i].p_filesz;
 			for(int i = 0; i < copy_size; i++){
 				*((char *)pmo_start_vaddr + i) = *(pos + i);
 			}
-			
-			p_vaddr = elf->p_headers[i].p_vaddr;
-			
+
 			flags = PFLAGS2VMRFLAGS(elf->p_headers[i].p_flags);
 
 			ret = vmspace_map_range(vmspace,
@@ -391,7 +392,14 @@ int sys_set_affinity(u64 thread_cap, s32 aff)
 	 * Lab4
 	 * Finish the sys_set_affinity
 	 */
-	return -1;
+	BUG_ON(!thread);
+
+	thread->thread_ctx->affinity = aff;
+
+	if (thread_cap != -1)
+		obj_put(thread);
+
+	return ret;
 }
 
 int sys_get_affinity(u64 thread_cap)
@@ -412,5 +420,12 @@ int sys_get_affinity(u64 thread_cap)
 	 * Lab4
 	 * Finish the sys_get_affinity
 	 */
-	return -1;
+	BUG_ON(!thread);
+	
+	aff = thread->thread_ctx->affinity;
+
+	if (thread_cap != -1)
+		obj_put(thread);
+
+	return aff;
 }

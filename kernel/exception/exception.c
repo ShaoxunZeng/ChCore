@@ -26,22 +26,21 @@ u8 irq_handle_type[MAX_IRQ_NUM];
 
 void exception_init_per_cpu(void)
 {
+	disable_irq();
 	/**
 	 * Lab4
 	 *
 	 * Uncomment the timer_init() when you are handling preemptive
 	 * shceduling
 	 */
-	// timer_init();
+	 timer_init();
 
 	/**
 	 * Lab3: Your code here
 	 * Setup the exception vector with the asm function written in exception.S
 	 */
-	disable_irq();
 
 	set_exception_vector();
-
 	enable_irq();
 }
 
@@ -57,6 +56,8 @@ void handle_entry_c(int type, u64 esr, u64 address)
 	 * Lab4
 	 * Acquire the big kernel lock, if the exception is from kernel
 	 */
+	if(type >= SYNC_EL0_64)
+		lock_kernel();
 
 	/* ec: exception class */
 	u32 esr_ec = GET_ESR_EL1_EC(esr);
@@ -86,7 +87,8 @@ void handle_entry_c(int type, u64 esr, u64 address)
 			break;
 
 	default:
-		kdebug("Unsupported Exception ESR %lx\n", esr);
+        kinfo("Unsupported Exception ESR %lx\n", esr);
+        sys_exit(-ESUPPORT);
 		break;
 	}
 }

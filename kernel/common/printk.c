@@ -102,7 +102,7 @@ static int printk_write_num(char **out, long long i, int base, int sign,
 {
 	char print_buf[PRINT_BUF_LEN];
 	char *s;
-	int t, neg = 0, pc = 0;
+	int neg = 0, pc = 0;
 	unsigned long long u = i;
 
 	if (i == 0) {
