@@ -26,7 +26,6 @@ u8 irq_handle_type[MAX_IRQ_NUM];
 
 void exception_init_per_cpu(void)
 {
-	disable_irq();
 	/**
 	 * Lab4
 	 *
@@ -41,7 +40,6 @@ void exception_init_per_cpu(void)
 	 */
 
 	set_exception_vector();
-	enable_irq();
 }
 
 void exception_init(void)
