@@ -47,6 +47,9 @@ typedef u64 pmo_type_t;
 #define PMO_DEVICE     5	/* memory mapped device registers */
 
 struct pmobject {
+	/* we can't mamage the physical memory and use the start paddr */
+	/* if the type is PMO_ANONYM */
+	/* see exception/pgfualt.c */
 	struct radix *radix;	/* record physical pages */
 	paddr_t start;
 	size_t size;

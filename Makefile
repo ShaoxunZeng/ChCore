@@ -63,5 +63,8 @@ run-%-gdb: prep-%
 	@echo "*** Now starting qemu-gdb"
 	$(QEMU) $(QEMUOPTS) -S
 
+gradep:
+	@find . -exec touch {} \; && make clean && make && make grade
+
 .PHONY: FORCE
 FORCE:

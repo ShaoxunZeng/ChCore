@@ -102,7 +102,7 @@ static int printk_write_num(char **out, long long i, int base, int sign,
 {
 	char print_buf[PRINT_BUF_LEN];
 	char *s;
-	int t, neg = 0, pc = 0;
+	int neg = 0, pc = 0;
 	unsigned long long u = i;
 
 	if (i == 0) {
@@ -119,6 +119,18 @@ static int printk_write_num(char **out, long long i, int base, int sign,
 	// store the digitals in the buffer `print_buf`:
 	// 1. the last postion of this buffer must be '\0'
 	// 2. the format is only decided by `base` and `letbase` here
+	s = print_buf + PRINT_BUF_LEN;
+	*--s = '\0';
+	while(u > 0){
+		int d = u % base;
+		if(d < 10){
+			*--s = d + '0';
+		} else {
+			*--s = d - 10 + letbase;
+		}
+
+		u /= base;
+	}
 
 	if (neg) {
 		if (width && (flags & PAD_ZERO)) {
@@ -192,6 +204,13 @@ static int simple_vsprintf(char **out, const char *format, va_list ap)
 				u.u = va_arg(ap, unsigned int);
 				pc +=
 				    printk_write_num(out, u.u, 10, 0, width,
+						     flags, 'a');
+				break;
+
+			case ('b'):
+				u.u = va_arg(ap, unsigned int);
+				pc +=
+				    printk_write_num(out, u.u, 2, 0, width,
 						     flags, 'a');
 				break;
 

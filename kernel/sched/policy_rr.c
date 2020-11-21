@@ -23,7 +23,7 @@
 #include <process/thread.h>
 #include <exception/irq.h>
 #include <sched/context.h>
-#include <common/lock.h>
+#include <common/types.h>
 
 /* in arch/sched/idle.S */
 void idle_thread_routine(void);
@@ -52,7 +52,41 @@ struct thread idle_threads[PLAT_CPU_NUM];
  */
 int rr_sched_enqueue(struct thread *thread)
 {
-	return -1;
+	/* basic checking */
+	if(thread == NULL || thread->thread_ctx == NULL){
+		return -1;
+	}
+
+	/* already ready (in the ready queue) */
+	if(thread->thread_ctx->state == TS_READY){
+		return -1;
+	}
+
+	/* If the thread is IDEL thread, do nothing */
+	if(thread->thread_ctx->type == TYPE_IDLE){
+		return 0;
+	}
+
+	/* If affinity = NO_AFF, assign the core to the current cpu */
+	int cpu_to_sched;
+	s32 affinity = thread->thread_ctx->affinity;
+	/* check if the affinity is valid */
+	if(affinity == NO_AFF){
+		cpu_to_sched = smp_get_cpu_id();
+	}
+	else if(affinity >= 0 && affinity < PLAT_CPU_NUM){
+		cpu_to_sched = affinity;
+	} else {
+		return -1;
+	}
+
+	/* update the flags */
+	thread->thread_ctx->state = TS_READY;
+	thread->thread_ctx->cpuid = cpu_to_sched;
+
+	list_append(&thread->ready_queue_node, &rr_ready_queue[cpu_to_sched]);
+
+	return 0;
 }
 
 /*
@@ -63,23 +97,64 @@ int rr_sched_enqueue(struct thread *thread)
  */
 int rr_sched_dequeue(struct thread *thread)
 {
-	return -1;
+	if(thread == NULL || thread->thread_ctx == NULL){
+		return -1;
+	}
+
+	/* If the thread is IDEL thread, ret -1 */
+	if(thread->thread_ctx->type == TYPE_IDLE){
+		return -1;
+	}
+
+	/* following two make sure the thread is in this cpu's ready queue */
+	/* If the thread is not on this cpu, ret -1 */
+	if(thread->thread_ctx->cpuid != smp_get_cpu_id()){
+		return -1;
+	}
+	/* If the thread is not ready, ret -1 */
+	if(thread->thread_ctx->state != TS_READY){
+		return -1;
+	}
+
+	list_del(&thread->ready_queue_node);
+
+	thread->thread_ctx->state = TS_INTER;
+
+	return 0;
 }
 
 /*
  * Lab4
  * The helper function
  * Choose an appropriate thread and dequeue from ready queue
- * 
- * If there is no ready thread in the current CPU's ready queue, 
+ *
+ * If there is no ready thread in the current CPU's ready queue,
  * choose the idle thread of the CPU.
- * 
- * Do not forget to check the type and 
+ *
+ * Do not forget to check the type and
  * state of the chosen thread
  */
 struct thread *rr_sched_choose_thread(void)
 {
-	return NULL;
+	if(list_empty(&rr_ready_queue[smp_get_cpu_id()])){
+		struct thread *idle = &idle_threads[smp_get_cpu_id()];
+		idle->thread_ctx->state = TS_INTER;
+		return idle;
+	}
+
+	struct thread *head_thread = list_entry(rr_ready_queue[smp_get_cpu_id()].next, struct thread, ready_queue_node);
+
+	if(head_thread->thread_ctx->cpuid != smp_get_cpu_id()
+		|| head_thread->thread_ctx->state != TS_READY){
+			printk("cpu id: %d ", smp_get_cpu_id());
+			print_thread(head_thread);
+			BUG_ON(1);
+	}
+
+	int ret = rr_sched_dequeue(head_thread);
+	BUG_ON(ret != 0);
+
+	return head_thread;
 }
 
 static inline void rr_sched_refill_budget(struct thread *target, u32 budget)
@@ -91,7 +166,7 @@ static inline void rr_sched_refill_budget(struct thread *target, u32 budget)
  * Schedule a thread to execute.
  * This function will suspend current running thread, if any, and schedule
  * another thread from `rr_ready_queue[cpu_id]`.
- * 
+ *
  * Hints:
  * Macro DEFAULT_BUDGET defines the value for resetting thread's budget.
  * After you get one thread from rr_sched_choose_thread, pass it to
@@ -100,7 +175,28 @@ static inline void rr_sched_refill_budget(struct thread *target, u32 budget)
  */
 int rr_sched(void)
 {
-	return -1;
+	/* current_thread has budget, reset the budget (based on the test) */
+	if(current_thread != NULL
+	&& current_thread->thread_ctx != NULL
+	&& current_thread->thread_ctx->sc->budget != 0){
+		current_thread->thread_ctx->sc->budget = DEFAULT_BUDGET;
+		return 0;
+	}
+
+	if(current_thread != NULL){
+		/* reset the badget to default */
+		current_thread->thread_ctx->sc->budget = DEFAULT_BUDGET;
+		int ret = rr_sched_enqueue(current_thread);
+		BUG_ON(ret < 0);
+	}
+
+	struct thread *new_cur_thread = rr_sched_choose_thread();
+
+	new_cur_thread->thread_ctx->sc->budget = DEFAULT_BUDGET;
+
+	switch_to_thread(new_cur_thread);
+
+	return 0;
 }
 
 /*
@@ -141,31 +237,16 @@ int rr_sched_init(void)
  */
 void rr_sched_handle_timer_irq(void)
 {
-}
-
-void rr_top(void)
-{
-	u32 cpuid = smp_get_cpu_id();
-	struct thread *thread;
-
-	printk("Current CPU %d\n", cpuid);
-	// lock_kernel();
-
-	for (cpuid = 0; cpuid < PLAT_CPU_NUM; cpuid++) {
-		printk("===== CPU %d =====\n", cpuid);
-		thread = current_threads[cpuid];
-		if (thread != NULL) {
-			print_thread(thread);
-		}
-		if (!list_empty(&rr_ready_queue[cpuid])) {
-			for_each_in_list(thread, struct thread,
-					 ready_queue_node,
-					 &rr_ready_queue[cpuid]) {
-				print_thread(thread);
-			}
-		}
+	if(current_thread != NULL
+	&& current_thread->thread_ctx != NULL
+	&& current_thread->thread_ctx->sc->budget != 0){
+		current_thread->thread_ctx->sc->budget--;
+		return;
 	}
-	// unlock_kernel();
+
+	/* schedule only if the badget is 0 or current thread is NULL */
+	int ret = rr_sched();
+	BUG_ON(ret < 0);
 }
 
 struct sched_ops rr = {
@@ -175,5 +256,4 @@ struct sched_ops rr = {
 	.sched_dequeue = rr_sched_dequeue,
 	.sched_choose_thread = rr_sched_choose_thread,
 	.sched_handle_timer_irq = rr_sched_handle_timer_irq,
-	.sched_top = rr_top
 };

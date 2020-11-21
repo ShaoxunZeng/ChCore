@@ -22,6 +22,8 @@
 #include <common/mm.h>
 #include <common/kmalloc.h>
 
+#include <sched/context.h>
+
 #include "esr.h"
 
 static inline vaddr_t get_fault_addr()
@@ -54,6 +56,7 @@ void do_page_fault(u64 esr, u64 fault_ins_addr)
 				kinfo("pgfault at 0x%p failed\n", fault_addr);
 				sys_exit(ret);
 			}
+			arch_set_thread_next_ip(current_thread, fault_ins_addr);
 			break;
 		}
 	default:
@@ -68,7 +71,7 @@ int handle_trans_fault(struct vmspace *vmspace, vaddr_t fault_addr)
 	struct vmregion *vmr;
 	struct pmobject *pmo;
 	paddr_t pa;
-	u64 offset;
+//	u64 offset;
 
 	/*
 	 * Lab3: your code here
@@ -86,6 +89,32 @@ int handle_trans_fault(struct vmspace *vmspace, vaddr_t fault_addr)
 	 * are recorded in a radix tree for easy management. Such code
 	 * has been omitted in our lab for simplification.
 	 */
+	vmr = find_vmr_for_va(vmspace, fault_addr);
+	if(vmr == NULL){
+		return -ENOMAPPING;
+	}
+	
+	pmo = vmr->pmo;
+	if(pmo->type != PMO_ANONYM){
+		return -ENOMAPPING;
+	}
+	/* notice here we don't update the pmo's start paddr */
+	/* and we don't use radix to manage the physical memory */
+	/* which means we can't mamage the physical memory and use the start paddr */
+	/* if the type is PMO_ANONYM */
+	void* page = get_pages(0);
+	if(page == NULL){
+		return -ENOMAPPING;
+	}
+
+	memset((void *)page, 0, PAGE_SIZE);
+	pa = (paddr_t)virt_to_phys((vaddr_t) page);
+
+	fault_addr = ROUND_DOWN(fault_addr, PAGE_SIZE);
+	int ret = map_range_in_pgtbl(vmspace->pgtbl, fault_addr, pa, PAGE_SIZE, vmr->perm);
+	if(ret < 0){
+		return -ENOMAPPING;
+	}
 
 	return 0;
 }

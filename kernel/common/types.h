@@ -19,8 +19,8 @@ typedef unsigned int u32;
 typedef unsigned short u16;
 typedef unsigned char u8;
 typedef long long s64;
-#ifdef CHCORE
 typedef int s32;
+#ifdef CHCORE
 typedef short s16;
 typedef signed char s8;
 
