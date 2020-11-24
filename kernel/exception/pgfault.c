@@ -53,14 +53,14 @@ void do_page_fault(u64 esr, u64 fault_ins_addr)
 			    handle_trans_fault(current_thread->vmspace,
 					       fault_addr);
 			if (ret != 0) {
-				kinfo("pgfault at 0x%p failed\n", fault_addr);
+				kinfo("pgfault at 0x%p failed, ins address 0x%lx\n", fault_addr, fault_ins_addr);
 				sys_exit(ret);
 			}
 			arch_set_thread_next_ip(current_thread, fault_ins_addr);
 			break;
 		}
 	default:
-		kinfo("do_page_fault: fsc is unsupported (0x%b) now\n", fsc);
+		kinfo("do_page_fault: fsc is unsupported (0b%b) now, fault_addr is 0x%lx, fault_ins_address is 0x%lx\n", fsc, fault_addr, fault_ins_addr);
 		BUG_ON(1);
 		break;
 	}
@@ -91,6 +91,7 @@ int handle_trans_fault(struct vmspace *vmspace, vaddr_t fault_addr)
 	 */
 	vmr = find_vmr_for_va(vmspace, fault_addr);
 	if(vmr == NULL){
+		kinfo("handle_trans_fault find_vmr_for_va failed\n");
 		return -ENOMAPPING;
 	}
 	
@@ -104,6 +105,7 @@ int handle_trans_fault(struct vmspace *vmspace, vaddr_t fault_addr)
 	/* if the type is PMO_ANONYM */
 	void* page = get_pages(0);
 	if(page == NULL){
+		kinfo("handle_trans_fault get_pages failed\n");
 		return -ENOMAPPING;
 	}
 

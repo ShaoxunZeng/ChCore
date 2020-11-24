@@ -4,6 +4,7 @@
 #include <lib/type.h>
 #include <lib/errno.h>
 #include <lib/string.h>
+#include <lib/malloc.h>
 
 #define RADIX_NODE_BITS (9)
 #define RADIX_NODE_SIZE (1 << (RADIX_NODE_BITS))
@@ -14,6 +15,8 @@
 #define DIV_UP(a, b) (((a)+(b)-1)/(b))
 
 #define RADIX_LEVELS (DIV_UP(RADIX_MAX_BITS, RADIX_NODE_BITS))
+
+#define PAGE_NO(offset) (ROUND_DOWN(offset, PAGE_SIZE) / PAGE_SIZE)
 
 struct radix_node {
 	union {
@@ -55,16 +58,16 @@ static struct radix_node *new_radix_node(void)
 static int radix_add(struct radix *radix, u64 key, void *value)
 {
 	struct radix_node *node;
-	struct radix_node *new;
+	struct radix_node *new_node;
 	u16 index[RADIX_LEVELS];
 	int i;
 	int k;
 
 	if (!radix->root) {
-		new = new_radix_node();
-		if (IS_ERR(new))
+		new_node = new_radix_node();
+		if (IS_ERR(new_node))
 			return -ENOMEM;
-		radix->root = new;
+		radix->root = new_node;
 	}
 	node = radix->root;
 
@@ -78,10 +81,10 @@ static int radix_add(struct radix *radix, u64 key, void *value)
 	for (i = RADIX_LEVELS - 1; i > 0; --i) {
 		k = index[i];
 		if (!node->children[k]) {
-			new = new_radix_node();
-			if (IS_ERR(new))
+			new_node = new_radix_node();
+			if (IS_ERR(new_node))
 				return -ENOMEM;
-			node->children[k] = new;
+			node->children[k] = new_node;
 		}
 		node = node->children[k];
 	}

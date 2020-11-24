@@ -84,7 +84,7 @@ static int set_pte_flags(pte_t * entry, vmr_prop_t flags, int kind)
  * alloc: if true, allocate a ptp when missing
  *
  */
-static int get_next_ptp(ptp_t * cur_ptp, u32 level, vaddr_t va,
+int get_next_ptp(ptp_t * cur_ptp, u32 level, vaddr_t va,
 			ptp_t ** next_ptp, pte_t ** pte, bool alloc)
 {
 	u32 index = 0;
@@ -240,7 +240,8 @@ int map_range_in_pgtbl(vaddr_t * pgtbl, vaddr_t va, paddr_t pa,
 		entry->l3_page.is_page = 1;
 		entry->l3_page.pfn = pa >> PAGE_SHIFT;
 
-		set_pte_flags(entry, flags, va >= KBASE ? KERNEL_PTE : USER_PTE);
+		/* only support the user pte flags */
+		set_pte_flags(entry, flags, USER_PTE);
 
 		va += PAGE_SIZE;
 		pa += PAGE_SIZE;

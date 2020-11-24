@@ -16,6 +16,7 @@
 
 #include "buddy.h"
 #include "slab.h"
+#include "page_table.h"
 
 extern unsigned long *img_end;
 
@@ -48,33 +49,62 @@ unsigned long get_ttbr1(void)
  * 2. fill the block entry with corresponding attribution bit
  *
  */
-#define UXN	       (0x1UL << 54)
-#define ACCESSED       (0x1UL << 10)
-#define INNER_SHARABLE (0x3UL << 8)
-#define NORMAL_MEMORY  (0x4UL << 2)
-#define IS_VALID (1UL << 0)
 
 void map_kernel_space(vaddr_t va, paddr_t pa, size_t len)
 {
 	// <lab2>
 	vaddr_t *pgtbl = (vaddr_t *)get_ttbr1();
-	vmr_prop_t flags = 0UL 
-		| UXN
-		| ACCESSED
-		| INNER_SHARABLE
-		| NORMAL_MEMORY
-		| IS_VALID;
 
-	map_range_in_pgtbl(pgtbl, va, pa, len, flags);
-	// </lab2>
+	pa = ROUND_DOWN(pa, PAGE_SIZE);
+	va = ROUND_DOWN(va, PAGE_SIZE);
+	len = ROUND_UP(len, PAGE_SIZE);
+
+	for(int i = 0; i < len/PAGE_SIZE; i++){
+		ptp_t *cur_ptp = (ptp_t *)pgtbl;
+		ptp_t *next_ptp;
+		pte_t *entry;
+		int level = 0;
+		while(level < 3){
+			/* notice alloc is 1 along the way, to allocate the new page in the page table */
+			int ret = get_next_ptp(cur_ptp, level, va, &next_ptp, &entry, 1);
+			if(ret < 0){
+				return ret;
+			}
+			cur_ptp = next_ptp;
+			level++;
+		}
+		/* level == 3, get the corresponding page entry and modify the flags */
+		u32 index = GET_L3_INDEX(va);
+		entry = &(next_ptp->ent[index]);
+
+		entry->pte = 0;
+		entry->l3_page.is_valid = 1;
+		entry->l3_page.is_page = 1;
+		entry->l3_page.pfn = pa >> PAGE_SHIFT;
+
+		entry->l3_page.UXN = 1;
+		entry->l3_page.AF = 1;
+		entry->l3_page.SH = 3;
+		entry->l3_page.attr_index = 4;
+		entry->l3_page.is_valid = 1;
+
+		va += PAGE_SIZE;
+		pa += PAGE_SIZE;
+	}
+
+	flush_tlb();
+
+	// <lab2>
 }
 
 void kernel_space_check(void)
 {
 	unsigned long kernel_val;
-	for (unsigned long i = 128; i < 256; i++) {
-		kernel_val = *(unsigned long *)(KBASE + (i << 21));
-		kinfo("kernel_val: %lx\n", kernel_val);
+	for (unsigned long i = 0; i < 128 * 1024 / 4; i++) {
+		*(unsigned long *)(KBASE + (128 << 21) + i * PAGE_SIZE) = 1;
+		kernel_val = *(unsigned long *)(KBASE + (128 << 21) + i * PAGE_SIZE);
+		// kinfo("kernel_val: %lx\n", kernel_val);
+		BUG_ON(kernel_val != 1);
 	}
 	kinfo("kernel space check pass\n");
 }
@@ -104,7 +134,7 @@ void mm_init(void)
 	       "npages: 0x%lx, meta_page_size: 0x%lx\n",
 	       page_meta_start, start_vaddr, npages, sizeof(struct page));
 
-	// kinfo("img end address is: 0x%lx", &img_end);
+	kdebug("img end address is: 0x%lx", &img_end);
 		// img end address is: 0xa0000
 	// [INFO] [CHCORE] mm: free_mem_start is 0xffffff00000a0000, free_mem_end is 0xffffff0020c00000
 	// [INFO] page_meta_start: 0xffffff00000a0000, real_start_vadd: 0xffffff0001800000,npages: 0x1f400, meta_page_size: 0x20
@@ -117,5 +147,5 @@ void mm_init(void)
 
 	map_kernel_space(KBASE + (128UL << 21), 128UL << 21, 128UL << 21);
 	//check whether kernel space [KABSE + 256 : KBASE + 512] is mapped 
-	// kernel_space_check();
+	kernel_space_check();
 }

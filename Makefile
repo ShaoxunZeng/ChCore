@@ -66,5 +66,8 @@ run-%-gdb: prep-%
 gradep:
 	@find . -exec touch {} \; && make clean && make && make grade
 
+testfs:
+	@make user && make run-fs_test	
+
 .PHONY: FORCE
 FORCE:

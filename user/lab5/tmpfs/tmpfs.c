@@ -95,6 +95,7 @@ static struct inode *new_reg(void)
 	return inode;
 }
 
+/* len is the length of name */
 static struct dentry *new_dent(struct inode *inode, const char *name,
 			       size_t len)
 {
@@ -125,11 +126,32 @@ static int tfs_mknod(struct inode *dir, const char *name, size_t len, int mkdir)
 
 	BUG_ON(!name);
 
+	// TODO: check the inode->size field
 	if (len == 0) {
 		WARN("mknod with len of 0");
-		return -ENOENT;
+		// return -ENOENT;
 	}
 	// TODO: write your code here
+	if(mkdir){
+		inode = new_dir();
+		printf("tfs_mknod new_dir %s\n", name);
+		if(IS_ERR(inode)) return PTR_ERR(inode);
+		inode->type = FS_DIR;
+	} else {
+		inode = new_reg();
+		printf("tfs_mknod new_reg %s\n", name);
+		if(IS_ERR(inode)) return PTR_ERR(inode);
+		inode->type = FS_REG;
+	}
+
+	inode->size = len;
+
+	dent = new_dent(inode, name, strlen(name));
+	if(IS_ERR(dent)){
+		return PTR_ERR(dent);
+	}
+
+	htable_add(&dir->dentries, dent->name.hash, &dent->node);
 
 	return 0;
 }
@@ -170,6 +192,12 @@ static struct dentry *tfs_lookup(struct inode *dir, const char *name,
 // Note that when `*name` ends with '/', the inode of last component will be
 // saved in `*dirat` regardless of its type (e.g., even when it's FS_REG) and
 // `*name` will point to '\0'
+
+// notice: if mkdir_p is true, then create the directory but not the regular file
+// which means if the regular file dosen't exist, then don't end with '/'
+// otherwise it could be seen as a directory to create
+
+// warning: now mkdir_p should be 0, because of the tfs_mknod require the len != 0
 int tfs_namex(struct inode **dirat, const char **name, int mkdir_p)
 {
 	BUG_ON(dirat == NULL);
@@ -194,6 +222,54 @@ int tfs_namex(struct inode **dirat, const char **name, int mkdir_p)
 	// make sure a child name exists
 	if (!**name)
 		return -EINVAL;
+
+	while(**name){
+		int name_len = 0;
+		char *origin_name = *name;
+		while(**name && **name != '/'){
+			name_len++;
+			++(*name);
+		}
+
+		if(**name == '/'){
+			++(*name);
+		} else {
+			*name = origin_name;
+			return;
+		}
+
+		char *dir_name = malloc(name_len + 1);
+		memcpy(dir_name, origin_name, name_len);
+		dir_name[name_len] = '\0';
+
+
+		struct dentry *dent = tfs_lookup(*dirat, dir_name, name_len);
+
+		if(dent != NULL){
+			// could be a regular file if ends with "/"
+			*dirat = dent->inode;
+		}
+		else if(dent == NULL){
+			if(!mkdir_p){
+				free(dir_name);
+				return -ENOENT;
+			} else {
+				// should failed, becauce tfs_mknod's size shouldn't be 0
+				int ret = tfs_mkdir(*dirat, dir_name, 0);
+				if(ret < 0) {
+					free(dir_name);
+					return ret;
+				}
+			}
+
+			dent = tfs_lookup(*dirat, dir_name, name_len);
+			*dirat = dent->inode;
+		}
+
+		free(dir_name);
+		
+	}
+
 	return 0;
 }
 
@@ -276,6 +352,26 @@ ssize_t tfs_file_write(struct inode * inode, off_t offset, const char *data,
 	void *page;
 
 	// TODO: write your code here
+	while(size != 0){
+		page_no = PAGE_NO(cur_off);
+		page = radix_get(&inode->data, page_no);
+		if(page == NULL){
+			page = malloc(PAGE_SIZE);
+			if(page == NULL){
+				return -ENOMEM;
+			}
+			int ret = radix_add(&inode->data, page_no, page);
+			if(IS_ERR(ret)){
+				return ret;
+			}
+		}
+		page_off = cur_off - ROUND_DOWN(cur_off, PAGE_SIZE);
+		to_write = MIN(PAGE_SIZE-page_off, size);
+		memcpy(page, data, to_write);
+
+		size -= to_write;
+		cur_off += to_write;
+	}
 
 	return cur_off - offset;
 }
@@ -295,8 +391,23 @@ ssize_t tfs_file_read(struct inode * inode, off_t offset, char *buff,
 	size_t to_read;
 	void *page;
 
+	while(size != 0){
+		page_no = PAGE_NO(cur_off);
+		page = radix_get(&inode->data, page_no);
+		if(page == NULL)
+			return -ENODATA;
+		page_off = cur_off - ROUND_DOWN(cur_off, PAGE_SIZE);
+		to_read = MIN(PAGE_SIZE-page_off, size);
+		memcpy(buff, page, to_read);
+
+		size -= to_read;
+		cur_off += to_read;
+	}
+
 	return cur_off - offset;
 }
+
+#define S_ISDIR(m) (((m) & 0170000) == (0040000)) 
 
 // load the cpio archive into tmpfs with the begin address as `start` in memory
 // You need to create directories and files if necessary. You also need to write
@@ -306,7 +417,6 @@ int tfs_load_image(const char *start)
 	struct cpio_file *f;
 	struct inode *dirat;
 	struct dentry *dent;
-	const char *leaf;
 	size_t len;
 	int err;
 	ssize_t write_count;
@@ -317,8 +427,58 @@ int tfs_load_image(const char *start)
 	cpio_extract(start, "/");
 
 	for (f = g_files.head.next; f; f = f->next) {
+		dirat = tmpfs_root;
+
 		// TODO: Lab5: your code is here
+		if(0 == strcmp(f->name, ".") || 0 == strcmp(f->name, ".."))
+			continue;
+
+		char *file_name = malloc(f->header.c_namesize + 1);
+		void *origin_file_name_ptr = file_name;
+		memcpy(file_name, f->name, f->header.c_namesize);
+		file_name[f->header.c_namesize] = '\0';
+		printf("tfs_load_image file_name %s ", file_name);
+
+		err = tfs_namex(&dirat, &file_name, 0);
+		if(IS_ERR(err)){
+			free(origin_file_name_ptr);
+			return err;
+		}
+
+		if(S_ISDIR(f->header.c_mode)){
+			printf(" is dir\n");
+			printf("file size is %d\n", f->header.c_filesize);
+			err = tfs_mkdir(dirat, file_name, f->header.c_filesize);
+			if(IS_ERR(err)){
+				free(origin_file_name_ptr);
+				return err;
+			}
+			dent = tfs_lookup(dirat, file_name, strlen(file_name));
+			BUG_ON(dent == NULL);
+		} else {
+			printf(" is reg\n");
+			printf("file size is %d\n", f->header.c_filesize);
+			
+			err = tfs_creat(dirat, file_name, f->header.c_filesize);
+			if(IS_ERR(err)){
+				free(origin_file_name_ptr);
+				return err;
+			}
+
+			dent = tfs_lookup(dirat, file_name, strlen(file_name));
+			BUG_ON(dent == NULL);
+			dirat = dent->inode;
+
+			err = tfs_file_write(dirat, 0, f->data, f->header.c_filesize);
+			if(IS_ERR(err)){
+				free(origin_file_name_ptr);
+				return err;
+			}
+		}
+
+		free(origin_file_name_ptr);
 	}
+	printf("tfs_load_image finish!\n");
 
 	return 0;
 }
