@@ -22,7 +22,11 @@ int fs_server_mkdir(const char *path)
 	BUG_ON(*path != '/');
 
 	// TODO: your code here
-	return err;
+	err = tfs_namex(&dirat, &leaf, 0);
+	if (err)
+		return -ENOENT;
+
+	return tfs_mkdir(dirat, leaf, 0);
 }
 
 int fs_server_creat(const char *path)
@@ -35,7 +39,11 @@ int fs_server_creat(const char *path)
 	BUG_ON(*path != '/');
 
 	// TODO: your code here
-	return 0;
+	err = tfs_namex(&dirat, &leaf, 0);
+	if (err)
+		return -ENOENT;
+
+	return tfs_creat(dirat, leaf, 0);
 }
 
 int fs_server_unlink(const char *path)
@@ -48,7 +56,11 @@ int fs_server_unlink(const char *path)
 	BUG_ON(*path != '/');
 
 	// TODO: your code here
-	return err;
+	err = tfs_namex(&dirat, &leaf, 0);
+	if (err)
+		return -ENOENT;	
+
+	return tfs_remove(dirat, leaf, strlen(leaf));
 }
 
 int fs_server_rmdir(const char *path)
@@ -61,7 +73,11 @@ int fs_server_rmdir(const char *path)
 	BUG_ON(*path != '/');
 
 	// TODO: your code here
-	return err;
+	err = tfs_namex(&dirat, &leaf, 0);
+	if (err)
+		return -ENOENT;	
+
+	return tfs_remove(dirat, leaf, strlen(leaf));
 }
 
 /* use absolute path, offset and count to read directly */
@@ -74,7 +90,13 @@ int fs_server_read(const char *path, off_t offset, void *buf, size_t count)
 	BUG_ON(*path != '/');
 
 	// TODO: your code here
-	return ret;
+	inode = tfs_open_path(path);
+	if (inode) {
+		if (inode->type == FS_REG)
+			return tfs_file_read(inode, offset, buf, count);
+		return -ENOTREG;
+	}
+	return -ENOENT;
 }
 
 /* use absolute path, offset and count to write directly */
@@ -88,7 +110,13 @@ int fs_server_write(const char *path, off_t offset, const void *buf,
 	BUG_ON(*path != '/');
 
 	// TODO: your code here
-	return ret;
+	inode = tfs_open_path(path);
+	if (inode) {
+		if (inode->type == FS_REG)
+			return tfs_file_write(inode, offset, buf, count);
+		return -ENOTREG;
+	}
+	return -ENOENT;
 }
 
 ssize_t fs_server_get_size(const char *path)

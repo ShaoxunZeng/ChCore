@@ -302,7 +302,7 @@ int launch_process_with_pmos_caps(struct user_elf *user_elf,
 		 * Use the given pmo_mao_reqs to map the vmspace in the child
 		 * process
 		 */
-		if (nr_pmo_map_reqs) {
+		if (nr_pmo_map_reqs > 0) {
 			ret =
 			    usys_map_pmos(new_process_cap, (void *)pmo_map_reqs,
 					  nr_pmo_map_reqs);
@@ -397,8 +397,11 @@ int launch_process_with_pmos_caps(struct user_elf *user_elf,
 
 	{
 		/* Step C: Output the child process & thread capabilities */
-		*child_process_cap = new_process_cap;
-		*child_main_thread_cap = main_thread_cap;
+		if(child_process_cap)
+			*child_process_cap = new_process_cap;
+
+		if(child_main_thread_cap)
+			*child_main_thread_cap = main_thread_cap;
 	}
 
 	return 0;

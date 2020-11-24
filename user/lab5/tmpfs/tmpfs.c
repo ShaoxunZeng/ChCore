@@ -128,18 +128,18 @@ static int tfs_mknod(struct inode *dir, const char *name, size_t len, int mkdir)
 
 	// TODO: check the inode->size field
 	if (len == 0) {
-		WARN("mknod with len of 0");
+		// WARN("mknod with len of 0");
 		// return -ENOENT;
 	}
 	// TODO: write your code here
 	if(mkdir){
 		inode = new_dir();
-		printf("tfs_mknod new_dir %s\n", name);
+		// printf("tfs_mknod new_dir %s\n", name);
 		if(IS_ERR(inode)) return PTR_ERR(inode);
 		inode->type = FS_DIR;
 	} else {
 		inode = new_reg();
-		printf("tfs_mknod new_reg %s\n", name);
+		// printf("tfs_mknod new_reg %s\n", name);
 		if(IS_ERR(inode)) return PTR_ERR(inode);
 		inode->type = FS_REG;
 	}
@@ -150,6 +150,9 @@ static int tfs_mknod(struct inode *dir, const char *name, size_t len, int mkdir)
 	if(IS_ERR(dent)){
 		return PTR_ERR(dent);
 	}
+
+	// TODO: check the inode->size field
+	dent->inode->size += len;
 
 	htable_add(&dir->dentries, dent->name.hash, &dent->node);
 
@@ -235,7 +238,7 @@ int tfs_namex(struct inode **dirat, const char **name, int mkdir_p)
 			++(*name);
 		} else {
 			*name = origin_name;
-			return;
+			return 0;
 		}
 
 		char *dir_name = malloc(name_len + 1);
@@ -273,8 +276,10 @@ int tfs_namex(struct inode **dirat, const char **name, int mkdir_p)
 	return 0;
 }
 
+// len is the length of the name
 int tfs_remove(struct inode *dir, const char *name, size_t len)
 {
+	// printf("remove file %s\n", name);
 	u64 hash = hash_chars(name, len);
 	struct dentry *dent, *target = NULL;
 	struct hlist_head *head;
@@ -343,6 +348,7 @@ int init_tmpfs(void)
 ssize_t tfs_file_write(struct inode * inode, off_t offset, const char *data,
 		       size_t size)
 {
+	// printf("tfs_file_write\n");
 	BUG_ON(inode->type != FS_REG);
 	BUG_ON(offset > inode->size);
 
@@ -383,6 +389,7 @@ ssize_t tfs_file_write(struct inode * inode, off_t offset, const char *data,
 ssize_t tfs_file_read(struct inode * inode, off_t offset, char *buff,
 		      size_t size)
 {
+	// printf("tfs_file_read\n");
 	BUG_ON(inode->type != FS_REG);
 	BUG_ON(offset > inode->size);
 
@@ -437,7 +444,7 @@ int tfs_load_image(const char *start)
 		void *origin_file_name_ptr = file_name;
 		memcpy(file_name, f->name, f->header.c_namesize);
 		file_name[f->header.c_namesize] = '\0';
-		printf("tfs_load_image file_name %s ", file_name);
+		// printf("tfs_load_image file_name %s ", file_name);
 
 		err = tfs_namex(&dirat, &file_name, 0);
 		if(IS_ERR(err)){
@@ -446,8 +453,8 @@ int tfs_load_image(const char *start)
 		}
 
 		if(S_ISDIR(f->header.c_mode)){
-			printf(" is dir\n");
-			printf("file size is %d\n", f->header.c_filesize);
+			// printf(" is dir\n");
+			// printf("file size is %d\n", f->header.c_filesize);
 			err = tfs_mkdir(dirat, file_name, f->header.c_filesize);
 			if(IS_ERR(err)){
 				free(origin_file_name_ptr);
@@ -456,8 +463,8 @@ int tfs_load_image(const char *start)
 			dent = tfs_lookup(dirat, file_name, strlen(file_name));
 			BUG_ON(dent == NULL);
 		} else {
-			printf(" is reg\n");
-			printf("file size is %d\n", f->header.c_filesize);
+			// printf(" is reg\n");
+			// printf("file size is %d\n", f->header.c_filesize);
 			
 			err = tfs_creat(dirat, file_name, f->header.c_filesize);
 			if(IS_ERR(err)){
@@ -478,7 +485,7 @@ int tfs_load_image(const char *start)
 
 		free(origin_file_name_ptr);
 	}
-	printf("tfs_load_image finish!\n");
+	// printf("tfs_load_image finish!\n");
 
 	return 0;
 }
@@ -513,9 +520,12 @@ int tfs_scan(struct inode *dir, unsigned int start, void *buf, void *end)
 	unsigned char type;
 	struct dentry *iter;
 
+	// printf("start %d\n", start);
+
 	for_each_in_htable(iter, b, node, &dir->dentries) {
 		if (cnt >= start) {
 			type = iter->inode->type;
+			// TODO: check the ino and size
 			ino = iter->inode->size;
 			ret = dirent_filler(&p, end, iter->name.str,
 					    cnt, type, ino);
@@ -541,8 +551,10 @@ struct inode *tfs_open_path(const char *path)
 		return tmpfs_root;
 
 	err = tfs_namex(&dirat, &leaf, 0);
-	if (err)
+	if (err){
+		// printf("tfs_open_path not found %s\n", path);
 		return NULL;
+	}
 
 	dent = tfs_lookup(dirat, leaf, strlen(leaf));
 	return dent ? dent->inode : NULL;

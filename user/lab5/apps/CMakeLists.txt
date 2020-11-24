@@ -31,3 +31,6 @@ set_property(
 	LINK_FLAGS
 	"-e START"
 )
+
+set(CMAKE_C_FLAGS_RELEASE "-O1 -g2")
+set(CMAKE_C_FLAGS_DEBUG "-O0 -g")

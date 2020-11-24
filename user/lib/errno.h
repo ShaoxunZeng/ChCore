@@ -21,7 +21,9 @@
 #define	EFAULT		19	/* Bad address */
 #define EBUSY           20
 
-#define EMAX            21
+#define ENOTREG         22	/* Does not refer to a regular file */
+
+#define EMAX            23
 
 #define ERR_PTR(x) ((void *)(s64)(x))
 #define PTR_ERR(x) ((long)(x))

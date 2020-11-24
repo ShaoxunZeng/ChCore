@@ -69,5 +69,11 @@ gradep:
 testfs:
 	@make user && make run-fs_test	
 
+shell:
+	@make user && make build bin=init && make qemu
+
+shell-gdb:
+	@make user && make build bin=init && make qemu-gdb
+
 .PHONY: FORCE
 FORCE:
