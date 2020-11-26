@@ -249,6 +249,18 @@ void rr_sched_handle_timer_irq(void)
 	BUG_ON(ret < 0);
 }
 
+void rr_top(void){
+	struct thread *thread;
+	printk("Current CPU %d\n", smp_get_cpu_id());
+	for(int i = 0; i < 4; i++){
+		printk("===== CPU %d =====\n", i);
+		print_thread(current_threads[i]);
+		for_each_in_list(thread, struct thread, ready_queue_node, &rr_ready_queue[i]){
+			print_thread(thread);
+		}
+	}
+}
+
 struct sched_ops rr = {
 	.sched_init = rr_sched_init,
 	.sched = rr_sched,
@@ -256,4 +268,5 @@ struct sched_ops rr = {
 	.sched_dequeue = rr_sched_dequeue,
 	.sched_choose_thread = rr_sched_choose_thread,
 	.sched_handle_timer_irq = rr_sched_handle_timer_irq,
+	.sched_top = rr_top,
 };

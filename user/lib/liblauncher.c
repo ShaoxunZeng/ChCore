@@ -110,7 +110,7 @@ int readelf_from_kernel_cpio(const char *filename, struct user_elf *user_elf)
 }
 
 ipc_struct_t *tmpfs_ipc_struct;
-static int fs_read(const char *path, int *tmpfs_read_pmo_cap)
+static int fs_read(const char *path, int *tmpfs_read_elf_pmo_cap)
 {
 	ipc_msg_t *ipc_msg;
 	int ret;
@@ -124,15 +124,15 @@ static int fs_read(const char *path, int *tmpfs_read_pmo_cap)
 	ipc_set_msg_data(ipc_msg, (char *)&fr, 0, sizeof(struct fs_request));
 	ret = ipc_call(tmpfs_ipc_struct, ipc_msg);
 
-	*tmpfs_read_pmo_cap = usys_create_pmo(ret, PMO_DATA);
+	*tmpfs_read_elf_pmo_cap = usys_create_pmo(ret, PMO_DATA);
 
 	fr.req = FS_REQ_READ;
 	strcpy((void *)fr.path, path);
 	fr.offset = 0;
-	fr.buff = (char *)TMPFS_READ_BUF_VADDR;
+	fr.buff = (char *)TMPFS_READ_ELF_BUF_VADDR;
 	fr.count = ret;
 	fr.req = FS_REQ_READ;
-	ipc_set_msg_cap(ipc_msg, 0, *tmpfs_read_pmo_cap);
+	ipc_set_msg_cap(ipc_msg, 0, *tmpfs_read_elf_pmo_cap);
 	ipc_set_msg_data(ipc_msg, (char *)&fr, 0, sizeof(struct fs_request));
 	ret = ipc_call(tmpfs_ipc_struct, ipc_msg);
 
@@ -143,23 +143,23 @@ static int fs_read(const char *path, int *tmpfs_read_pmo_cap)
 int readelf_from_fs(const char *pathbuf, struct user_elf *user_elf)
 {
 	int ret;
-	int tmpfs_read_pmo_cap;
+	int tmpfs_read_elf_pmo_cap;
 
-	ret = fs_read(pathbuf, &tmpfs_read_pmo_cap);
+	ret = fs_read(pathbuf, &tmpfs_read_elf_pmo_cap);
 	if (ret < 0) {
 		return ret;
 	}
 
 	ret = usys_map_pmo(SELF_CAP,
-			   tmpfs_read_pmo_cap,
-			   TMPFS_READ_BUF_VADDR, VM_READ | VM_WRITE);
+			   tmpfs_read_elf_pmo_cap,
+			   TMPFS_READ_ELF_BUF_VADDR, VM_READ | VM_WRITE);
 	BUG_ON(ret < 0);
 
 	strcpy(user_elf->path, pathbuf);
-	ret = parse_elf_from_binary((const char *)TMPFS_READ_BUF_VADDR,
+	ret = parse_elf_from_binary((const char *)TMPFS_READ_ELF_BUF_VADDR,
 				    user_elf);
 
-	usys_unmap_pmo(SELF_CAP, tmpfs_read_pmo_cap, TMPFS_READ_BUF_VADDR);
+	usys_unmap_pmo(SELF_CAP, tmpfs_read_elf_pmo_cap, TMPFS_READ_ELF_BUF_VADDR);
 
 	return ret;
 }

@@ -5,6 +5,68 @@
 #define server_ready_flag_offset 0x0
 #define server_exit_flag_offset  0x4
 
+// prepare the augument for fs_server_scan
+static int do_scan(struct fs_request *fr, ipc_msg_t * ipc_msg){
+	int ret = 0;
+	int err = 0;
+
+	int cap = ipc_get_msg_cap(ipc_msg, 0);
+#ifdef LOG	
+	printf("[Debug][Server] do_scan cap: %d\n", cap);
+	printf("[Debug][Server] do_scan path: %s\n", fr->path);
+	printf("[Debug][Server] do_scan offset/start: %d\n", fr->offset);
+	printf("[Debug][Server] do_scan count: %d\n", fr->count);
+#endif
+	/* map copied pmo to another va */
+	err = usys_map_pmo(SELF_CAP, cap, TMPFS_SCAN_BUF_VADDR,
+			VM_READ | VM_WRITE);
+	fail_cond(err < 0, "usys_map_pmo on copied pmo ret %d\n", err);
+
+	ret = fs_server_scan(fr->path, fr->offset, (void *)TMPFS_SCAN_BUF_VADDR, fr->count);
+	fail_cond(ret < 0, "fs_server_scan ret %d\n", ret);
+
+	/* unmap copied pmo */
+	err = usys_unmap_pmo(SELF_CAP, cap, TMPFS_SCAN_BUF_VADDR);
+	fail_cond(err < 0, "usys_unmap_pmo on copied pmo ret %d\n", err);
+
+#ifdef LOG	
+	printf("[Debug][Server] fs_server_scan success ret: %d\n", ret);
+#endif
+	return ret;
+}
+
+
+// prepare the augument for fs_server_read
+static int do_read(struct fs_request *fr, ipc_msg_t * ipc_msg){
+	int ret = 0;
+	int err = 0;
+
+	int cap = ipc_get_msg_cap(ipc_msg, 0);
+#define LOG
+#ifdef LOG	
+	printf("[Debug][Server] do_read cap: %d\n", cap);
+	printf("[Debug][Server] do_read path: %s\n", fr->path);
+	printf("[Debug][Server] do_read offset/start: %d\n", fr->offset);
+	printf("[Debug][Server] do_read count: %d\n", fr->count);
+#endif
+	/* map copied pmo to another va */
+	err = usys_map_pmo(SELF_CAP, cap, TMPFS_READ_BUF_VADDR,
+			VM_READ | VM_WRITE);
+	fail_cond(err < 0, "usys_map_pmo on copied pmo ret %d\n", err);
+
+	ret = fs_server_read(fr->path, fr->offset, (void *)TMPFS_READ_BUF_VADDR, fr->count);
+	fail_cond(ret < 0, "do_read ret %d\n", ret);
+
+	/* unmap copied pmo */
+	err = usys_unmap_pmo(SELF_CAP, cap, TMPFS_READ_BUF_VADDR);
+	fail_cond(err < 0, "usys_unmap_pmo on copied pmo ret %d\n", err);
+
+#ifdef LOG	
+	printf("[Debug][Server] do_read success ret: %d\n", ret);
+#endif
+	return ret;
+}
+
 static void fs_dispatch(ipc_msg_t * ipc_msg)
 {
 	int ret = 0;
@@ -15,7 +77,7 @@ static void fs_dispatch(ipc_msg_t * ipc_msg)
 		switch (fr->req) {
 		case FS_REQ_SCAN:
 				// TODO: you code here
-			ret = fs_server_scan(fr->path, fr->offset, fr->buff, fr->count);
+			ret = do_scan(fr, ipc_msg);
 			break;
 		case FS_REQ_MKDIR:
 			ret = fs_server_mkdir(fr->path);
@@ -41,11 +103,13 @@ static void fs_dispatch(ipc_msg_t * ipc_msg)
 			break;
 		case FS_REQ_WRITE:
 				// TODO: you code here
-			ret = fs_server_write(fr->path, fr->offset, fr->buff, fr->count);
+			error("%s: %d Not impelemented yet\n", __func__,
+			      ((int *)ipc_get_msg_data(ipc_msg))[0]);
+			usys_exit(-1);
 			break;
 		case FS_REQ_READ:
 				// TODO: you code here
-			ret = fs_server_read(fr->path, fr->offset, fr->buff, fr->count);
+			ret = do_read(fr, ipc_msg);
 			break;
 		case FS_REQ_GET_SIZE:{
 				ret = fs_server_get_size(fr->path);

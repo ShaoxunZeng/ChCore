@@ -144,15 +144,15 @@ static int tfs_mknod(struct inode *dir, const char *name, size_t len, int mkdir)
 		inode->type = FS_REG;
 	}
 
+	// TODO: check the inode->size field
+	// now this field is only correct when it is a regular file
+	// and could not be resized
 	inode->size = len;
 
 	dent = new_dent(inode, name, strlen(name));
 	if(IS_ERR(dent)){
 		return PTR_ERR(dent);
 	}
-
-	// TODO: check the inode->size field
-	dent->inode->size += len;
 
 	htable_add(&dir->dentries, dent->name.hash, &dent->node);
 
@@ -345,6 +345,9 @@ int init_tmpfs(void)
 // it may resize the file
 // `radix_get`, `radix_add` are used in this function
 // You can use memory functions defined in libc
+
+// notice we don't write '\0' at the end
+// notice we don't update the size field even if the file is resized
 ssize_t tfs_file_write(struct inode * inode, off_t offset, const char *data,
 		       size_t size)
 {
@@ -366,6 +369,7 @@ ssize_t tfs_file_write(struct inode * inode, off_t offset, const char *data,
 			if(page == NULL){
 				return -ENOMEM;
 			}
+			memset(page, 0, PAGE_SIZE);
 			int ret = radix_add(&inode->data, page_no, page);
 			if(IS_ERR(ret)){
 				return ret;
@@ -373,7 +377,7 @@ ssize_t tfs_file_write(struct inode * inode, off_t offset, const char *data,
 		}
 		page_off = cur_off - ROUND_DOWN(cur_off, PAGE_SIZE);
 		to_write = MIN(PAGE_SIZE-page_off, size);
-		memcpy(page, data, to_write);
+		memcpy(page, data + cur_off - offset, to_write);
 
 		size -= to_write;
 		cur_off += to_write;
@@ -386,10 +390,10 @@ ssize_t tfs_file_write(struct inode * inode, off_t offset, const char *data,
 // exceed the file size
 // `radix_get` is used in this function
 // You can use memory functions defined in libc
+// notice we don't write '\0' at the end of the buff
 ssize_t tfs_file_read(struct inode * inode, off_t offset, char *buff,
 		      size_t size)
 {
-	// printf("tfs_file_read\n");
 	BUG_ON(inode->type != FS_REG);
 	BUG_ON(offset > inode->size);
 
@@ -401,16 +405,16 @@ ssize_t tfs_file_read(struct inode * inode, off_t offset, char *buff,
 	while(size != 0){
 		page_no = PAGE_NO(cur_off);
 		page = radix_get(&inode->data, page_no);
-		if(page == NULL)
+		if(page == NULL){
 			return -ENODATA;
+		}
 		page_off = cur_off - ROUND_DOWN(cur_off, PAGE_SIZE);
 		to_read = MIN(PAGE_SIZE-page_off, size);
-		memcpy(buff, page, to_read);
+		memcpy(buff + cur_off - offset, page, to_read);
 
 		size -= to_read;
 		cur_off += to_read;
 	}
-
 	return cur_off - offset;
 }
 
@@ -444,7 +448,6 @@ int tfs_load_image(const char *start)
 		void *origin_file_name_ptr = file_name;
 		memcpy(file_name, f->name, f->header.c_namesize);
 		file_name[f->header.c_namesize] = '\0';
-		// printf("tfs_load_image file_name %s ", file_name);
 
 		err = tfs_namex(&dirat, &file_name, 0);
 		if(IS_ERR(err)){
@@ -453,8 +456,6 @@ int tfs_load_image(const char *start)
 		}
 
 		if(S_ISDIR(f->header.c_mode)){
-			// printf(" is dir\n");
-			// printf("file size is %d\n", f->header.c_filesize);
 			err = tfs_mkdir(dirat, file_name, f->header.c_filesize);
 			if(IS_ERR(err)){
 				free(origin_file_name_ptr);
@@ -463,9 +464,6 @@ int tfs_load_image(const char *start)
 			dent = tfs_lookup(dirat, file_name, strlen(file_name));
 			BUG_ON(dent == NULL);
 		} else {
-			// printf(" is reg\n");
-			// printf("file size is %d\n", f->header.c_filesize);
-			
 			err = tfs_creat(dirat, file_name, f->header.c_filesize);
 			if(IS_ERR(err)){
 				free(origin_file_name_ptr);
@@ -485,7 +483,6 @@ int tfs_load_image(const char *start)
 
 		free(origin_file_name_ptr);
 	}
-	// printf("tfs_load_image finish!\n");
 
 	return 0;
 }
@@ -519,10 +516,13 @@ int tfs_scan(struct inode *dir, unsigned int start, void *buf, void *end)
 	void *p = buf;
 	unsigned char type;
 	struct dentry *iter;
-
-	// printf("start %d\n", start);
-
+#ifdef LOG	
+	printf("[Debug][Server] tfs_scan start %d\n", start);
+#endif
 	for_each_in_htable(iter, b, node, &dir->dentries) {
+#ifdef LOG	
+		printf("[Debug][Server] tfs_scan filename: %s\n", iter->name.str);
+#endif		
 		if (cnt >= start) {
 			type = iter->inode->type;
 			// TODO: check the ino and size
@@ -535,11 +535,14 @@ int tfs_scan(struct inode *dir, unsigned int start, void *buf, void *end)
 		}
 		cnt++;
 	}
+#ifdef LOG	
+	printf("[Debug][Server] tfs_scan ret: %d\n", cnt - start);
+#endif
 	return cnt - start;
 
 }
 
-/* path[0] must be '/' */
+/* path[0] must be '/' and shouldn't end with '/' */
 struct inode *tfs_open_path(const char *path)
 {
 	struct inode *dirat = NULL;

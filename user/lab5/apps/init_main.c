@@ -9,6 +9,7 @@ char getch()
 {
 	char c;
 	// TODO: your code here
+	c = usys_getc();
 
 	return c;
 }
@@ -26,6 +27,9 @@ int main(int argc, char *argv[])
 	while (1) {
 		printf("\n");
 		buf = readline("$ ");
+#ifdef LOG
+		printf("[Debug] buf is : %s\n", buf);
+#endif
 		if (buf == NULL)
 			usys_exit(0);
 		if (buf[0] == 0)
