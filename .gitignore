@@ -14,3 +14,6 @@ build
 *.out
 *.pyc
 chcore.out
+
+.idea
+.DS_Store
