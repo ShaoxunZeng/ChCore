@@ -429,3 +429,10 @@ int sys_get_affinity(u64 thread_cap)
 
 	return aff;
 }
+
+int sys_is_thread_finished(u64 thread_cap)
+{		
+	struct thread *thread = (struct thread*)obj_get(current_process, thread_cap, TYPE_THREAD);
+
+	return thread == NULL;
+}

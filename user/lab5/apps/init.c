@@ -51,12 +51,16 @@ static int do_complement(char *buf, char *complement, int complement_time)
 	if(complement[path_start] == ' '){
 		path_start++;
 	}
-#ifdef LOG	
+	if(last_slash == -1){
+		last_slash = path_start - 1;
+	}
+	
+#ifdef LOG
 	printf("[Debug] path_start %d\n", path_start);
 	printf("[Debug] last_slash %d\n", last_slash);
 
 	printf("[Debug] complement[last_slash + 1] is %s\n", complement + last_slash + 1);
-#endif	
+#endif
 
 	char f_dirname[BUFLEN];
 	f_dirname[0] = '/';
@@ -451,10 +455,18 @@ int run_cmd(char *cmdline)
 	}
 
 	caps[0] = fs_server_cap;
-	ret = launch_process_with_pmos_caps(&user_elf, NULL, NULL,
+	int child_process_cap = -1;
+	int child_main_thread_cap = -1;
+	ret = launch_process_with_pmos_caps(&user_elf, &child_process_cap, &child_main_thread_cap,
 					     NULL, 0, caps, 1, 0);
 	fail_cond(ret != 0, "create_process returns %d\n", ret);
+	
+	// just because there is time limit in the test case
+	// so we should schedule quickly
 	usys_yield();
+	while(!sys_is_thread_finished(child_main_thread_cap)){
+
+	}
 	
 	return ret;
 }

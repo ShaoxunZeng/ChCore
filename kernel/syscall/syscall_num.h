@@ -43,6 +43,7 @@ void sys_ipc_reg_call(void);
 void sys_ipc_return(void);
 
 void sys_top(void);
+int sys_is_thread_finished(u64 thread_cap);
 
 #define SYS_putc				0
 #define SYS_getc				1
@@ -79,4 +80,5 @@ void sys_top(void);
 
 #define SYS_top                                 252
 #define SYS_fs_load_cpio			253
+#define SYS_is_thread_finished      254
 #define SYS_debug			        255

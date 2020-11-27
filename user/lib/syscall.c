@@ -237,3 +237,7 @@ void usys_top(void)
 {
 	syscall(SYS_top, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 }
+
+int sys_is_thread_finished(u64 thread_cap){
+	return syscall(SYS_is_thread_finished, thread_cap, 0, 0, 0, 0, 0, 0, 0, 0);
+}

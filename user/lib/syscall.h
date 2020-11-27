@@ -37,6 +37,7 @@
 
 #define SYS_top                                 252
 #define SYS_fs_load_cpio			253
+#define SYS_is_thread_finished		254
 #define SYS_debug			        255
 
 int usys_fs_load_cpio(u64 vaddr);
@@ -75,3 +76,4 @@ int usys_read_pmo(u64 cap, u64 offset, void *buf, u64 size);
 int usys_transfer_caps(u64, int *, int, int *);
 
 void usys_top(void);
+int sys_is_thread_finished(u64 thread_cap);

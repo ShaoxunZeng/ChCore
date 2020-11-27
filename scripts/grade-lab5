@@ -101,7 +101,7 @@ TOP_RE = r" *Thread *ffffff00[0-9a-z]{8}[\t ]*Type:[\t ]*[A-Z]{4}[\t ]*State:[\t
 @test(10, parent=test_shell_run)
 def test_top():
     matches = re.findall(TOP_RE, r.qemu.output, re.MULTILINE)
-    assert_equal(len(matches), 6)
+    assert_equal(len(matches), 5)
 
 
 run_tests()
