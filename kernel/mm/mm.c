@@ -16,7 +16,6 @@
 
 #include "buddy.h"
 #include "slab.h"
-#include "page_table.h"
 
 extern unsigned long *img_end;
 
@@ -55,45 +54,7 @@ void map_kernel_space(vaddr_t va, paddr_t pa, size_t len)
 	// <lab2>
 	vaddr_t *pgtbl = (vaddr_t *)get_ttbr1();
 
-	pa = ROUND_DOWN(pa, PAGE_SIZE);
-	va = ROUND_DOWN(va, PAGE_SIZE);
-	len = ROUND_UP(len, PAGE_SIZE);
-
-	for(int i = 0; i < len/PAGE_SIZE; i++){
-		ptp_t *cur_ptp = (ptp_t *)pgtbl;
-		ptp_t *next_ptp;
-		pte_t *entry;
-		int level = 0;
-		while(level < 3){
-			/* notice alloc is 1 along the way, to allocate the new page in the page table */
-			int ret = get_next_ptp(cur_ptp, level, va, &next_ptp, &entry, 1);
-			if(ret < 0){
-				return ret;
-			}
-			cur_ptp = next_ptp;
-			level++;
-		}
-		/* level == 3, get the corresponding page entry and modify the flags */
-		u32 index = GET_L3_INDEX(va);
-		entry = &(next_ptp->ent[index]);
-
-		entry->pte = 0;
-		entry->l3_page.is_valid = 1;
-		entry->l3_page.is_page = 1;
-		entry->l3_page.pfn = pa >> PAGE_SHIFT;
-
-		entry->l3_page.UXN = 1;
-		entry->l3_page.AF = 1;
-		entry->l3_page.SH = 3;
-		entry->l3_page.attr_index = 4;
-		entry->l3_page.is_valid = 1;
-
-		va += PAGE_SIZE;
-		pa += PAGE_SIZE;
-	}
-
-	flush_tlb();
-
+	map_range_in_pgtbl(pgtbl, va, pa, len, KERNEL_PT);
 	// <lab2>
 }
 
