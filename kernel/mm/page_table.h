@@ -22,6 +22,7 @@
 /* Description bits in page table entries. */
 
 /* Read-write permission. */
+#define AARCH64_PTE_AP_HIGH_RW_EL0_NORW   (0)
 #define AARCH64_PTE_AP_HIGH_RW_EL0_RW     (1)
 #define AARCH64_PTE_AP_HIGH_RO_EL0_RO     (3)
 
