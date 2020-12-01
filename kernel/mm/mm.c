@@ -61,7 +61,7 @@ void map_kernel_space(vaddr_t va, paddr_t pa, size_t len)
 void kernel_space_check(void)
 {
 	unsigned long kernel_val;
-	for (unsigned long i = 0; i < 128 * 1024; i++) {
+	for (unsigned long i = 0; i < (128 << 20) / PAGE_SIZE; i++) {
 		*(unsigned long *)(KBASE + (128 << 21) + i * PAGE_SIZE) = 1;
 		kernel_val = *(unsigned long *)(KBASE + (128 << 21) + i * PAGE_SIZE);
 		BUG_ON(kernel_val != 1);
